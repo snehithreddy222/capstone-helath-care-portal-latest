@@ -9,25 +9,53 @@ import {
   FiCreditCard,
   FiSettings,
   FiLogOut,
+  FiUsers,
+  FiFileText,
+  FiActivity,
 } from "react-icons/fi";
 import { authService } from "../../services/authService";
 
-const Item = ({ to, icon: Icon, label }) => (
-  <NavLink
-    to={to}
-    className={({ isActive }) => `nav-item ${isActive ? "nav-item-active" : ""}`}
-  >
-    <Icon className="text-[18px] shrink-0" />
-    <span className="text-[15px] font-medium">{label}</span>
-  </NavLink>
-);
+const Item = ({ to, icon, label }) => {
+  const Icon = icon;
+  return (
+    <NavLink
+      to={to}
+      className={({ isActive }) => `nav-item ${isActive ? "nav-item-active" : ""}`}
+    >
+      {Icon && <Icon className="text-[18px] shrink-0" />}
+      <span className="text-[15px] font-medium">{label}</span>
+    </NavLink>
+  );
+};
 
-export default function Sidebar() {
+export default function Sidebar({ role = "PATIENT" }) {
   const navigate = useNavigate();
   const logout = () => {
     authService.logout();
     navigate("/login");
   };
+
+  const patientNav = [
+    { to: "/patient/dashboard", icon: FiGrid, label: "Dashboard" },
+    { to: "/patient/appointments", icon: FiCalendar, label: "Appointments" },
+    { to: "/patient/messages", icon: FiMessageSquare, label: "Messages" },
+    { to: "/patient/test-results", icon: FiDroplet, label: "Test Results" },
+    { to: "/patient/medications", icon: FiHeart, label: "Medications" },
+    { to: "/patient/billings", icon: FiCreditCard, label: "Billings" },
+  ];
+
+  const doctorNav = [
+    { to: "/doctor/dashboard", icon: FiGrid, label: "Dashboard" },
+    { to: "/doctor/appointments", icon: FiCalendar, label: "Appointments" },
+    { to: "/doctor/patients", icon: FiUsers, label: "Patients" },
+    { to: "/doctor/schedule", icon: FiActivity, label: "Schedule" },
+    { to: "/doctor/medical-records", icon: FiFileText, label: "Medical Records" },
+    { to: "/doctor/prescriptions", icon: FiHeart, label: "Prescriptions" },
+    { to: "/doctor/messages", icon: FiMessageSquare, label: "Messages" },
+  ];
+
+  const navItems = role === "DOCTOR" ? doctorNav : patientNav;
+  const settingsPath = role === "DOCTOR" ? "/doctor/settings" : "/patient/settings";
 
   return (
     <aside className="shell-sidebar">
@@ -41,12 +69,9 @@ export default function Sidebar() {
 
       {/* Main nav */}
       <nav className="mt-2">
-        <Item to="/patient/dashboard" icon={FiGrid} label="Dashboard" />
-        <Item to="/patient/appointments" icon={FiCalendar} label="Appointments" />
-        <Item to="/patient/messages" icon={FiMessageSquare} label="Messages" />
-        <Item to="/patient/test-results" icon={FiDroplet} label="Test Results" />
-        <Item to="/patient/medications" icon={FiHeart} label="Medications" />
-        <Item to="/patient/billings" icon={FiCreditCard} label="Billings" />
+        {navItems.map((item) => (
+          <Item key={item.to} to={item.to} icon={item.icon} label={item.label} />
+        ))}
       </nav>
 
       {/* Spacer to push footer items down */}
@@ -55,13 +80,13 @@ export default function Sidebar() {
       {/* Footer actions: Account Settings above Logout */}
       <div className="px-3 pb-4">
         <NavLink
-          to="/patient/settings"
+          to={settingsPath}
           className={({ isActive }) =>
             `nav-item ${isActive ? "nav-item-active" : ""}`
           }
         >
           <FiSettings className="text-[18px] shrink-0" />
-          <span className="text-[15px] font-medium">Account Settings</span>
+          <span className="text-[15px] font-medium">Settings</span>
         </NavLink>
 
         <button

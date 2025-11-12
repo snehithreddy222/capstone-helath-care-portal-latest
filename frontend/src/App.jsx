@@ -7,7 +7,7 @@ import ProtectedRoute from "./routes/ProtectedRoute";
 import Sidebar from "./components/common/Sidebar";
 import Topbar from "./components/common/Topbar";
 
-// Pages
+// Patient Pages
 import Login from "./pages/Login";
 import Register from "./pages/Register";
 import PatientDashboard from "./pages/patient/PatientDashboard";
@@ -16,18 +16,39 @@ import PatientMessages from "./pages/patient/PatientMessages";
 import TestResults from "./pages/patient/TestResults";
 import Medications from "./pages/patient/Medications";
 import Billings from "./pages/patient/Billings";
-import ScheduleAppointment from "./pages/patient/ScheduleAppointment"; // <-- NEW
+import ScheduleAppointment from "./pages/patient/ScheduleAppointment";
 import AccountSettings from "./pages/patient/AccountSettings";
+
+// Doctor Pages
+import DoctorDashboard from "./pages/doctor/DoctorDashboard";
+import DoctorAppointments from "./pages/doctor/DoctorAppointments";
+import DoctorPatients from "./pages/doctor/DoctorPatients";
+import DoctorSchedule from "./pages/doctor/DoctorSchedule";
+import DoctorMedicalRecords from "./pages/doctor/DoctorMedicalRecords";
+import DoctorPrescriptions from "./pages/doctor/DoctorPrescriptions";
+import DoctorMessages from "./pages/doctor/DoctorMessages";
+import DoctorSettings from "./pages/doctor/DoctorSettings";
 
 function PatientLayout({ children }) {
   return (
     <div className="min-h-screen flex bg-gray-50">
-      {/* Sidebar (persistent) */}
       <aside className="w-[244px] bg-white border-r border-gray-200 sticky top-0 h-screen">
         <Sidebar role="PATIENT" />
       </aside>
+      <div className="flex-1 min-w-0 flex flex-col">
+        <Topbar />
+        <main className="main-inner">{children}</main>
+      </div>
+    </div>
+  );
+}
 
-      {/* Main column */}
+function DoctorLayout({ children }) {
+  return (
+    <div className="min-h-screen flex bg-gray-50">
+      <aside className="w-[244px] bg-white border-r border-gray-200 sticky top-0 h-screen">
+        <Sidebar role="DOCTOR" />
+      </aside>
       <div className="flex-1 min-w-0 flex flex-col">
         <Topbar />
         <main className="main-inner">{children}</main>
@@ -66,7 +87,6 @@ export default function App() {
               </ProtectedRoute>
             }
           />
-          {/* NEW: schedule form */}
           <Route
             path="/patient/appointments/new"
             element={
@@ -124,6 +144,88 @@ export default function App() {
                 <PatientLayout>
                   <AccountSettings />
                 </PatientLayout>
+              </ProtectedRoute>
+            }
+          />
+
+          {/* Doctor routes (protected) */}
+          <Route
+            path="/doctor/dashboard"
+            element={
+              <ProtectedRoute allowedRoles={["DOCTOR"]}>
+                <DoctorLayout>
+                  <DoctorDashboard />
+                </DoctorLayout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/doctor/appointments"
+            element={
+              <ProtectedRoute allowedRoles={["DOCTOR"]}>
+                <DoctorLayout>
+                  <DoctorAppointments />
+                </DoctorLayout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/doctor/patients"
+            element={
+              <ProtectedRoute allowedRoles={["DOCTOR"]}>
+                <DoctorLayout>
+                  <DoctorPatients />
+                </DoctorLayout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/doctor/schedule"
+            element={
+              <ProtectedRoute allowedRoles={["DOCTOR"]}>
+                <DoctorLayout>
+                  <DoctorSchedule />
+                </DoctorLayout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/doctor/medical-records"
+            element={
+              <ProtectedRoute allowedRoles={["DOCTOR"]}>
+                <DoctorLayout>
+                  <DoctorMedicalRecords />
+                </DoctorLayout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/doctor/prescriptions"
+            element={
+              <ProtectedRoute allowedRoles={["DOCTOR"]}>
+                <DoctorLayout>
+                  <DoctorPrescriptions />
+                </DoctorLayout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/doctor/messages"
+            element={
+              <ProtectedRoute allowedRoles={["DOCTOR"]}>
+                <DoctorLayout>
+                  <DoctorMessages />
+                </DoctorLayout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/doctor/settings"
+            element={
+              <ProtectedRoute allowedRoles={["DOCTOR"]}>
+                <DoctorLayout>
+                  <DoctorSettings />
+                </DoctorLayout>
               </ProtectedRoute>
             }
           />
