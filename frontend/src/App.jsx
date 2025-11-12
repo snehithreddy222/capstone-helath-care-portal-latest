@@ -16,8 +16,23 @@ import PatientMessages from "./pages/patient/PatientMessages";
 import TestResults from "./pages/patient/TestResults";
 import Medications from "./pages/patient/Medications";
 import Billings from "./pages/patient/Billings";
-import ScheduleAppointment from "./pages/patient/ScheduleAppointment"; // <-- NEW
+import ScheduleAppointment from "./pages/patient/ScheduleAppointment";
 import AccountSettings from "./pages/patient/AccountSettings";
+
+// Doctor Pages
+import DoctorDashboard from "./pages/doctor/DoctorDashboard";
+import DoctorAppointments from "./pages/doctor/DoctorAppointments";
+import DoctorPatients from "./pages/doctor/DoctorPatients";
+import DoctorMedicalRecords from "./pages/doctor/DoctorMedicalRecords";
+import DoctorPrescriptions from "./pages/doctor/DoctorPrescriptions";
+import DoctorSettings from "./pages/doctor/DoctorSettings";
+
+// Admin Pages
+import AdminDashboard from "./pages/admin/AdminDashboard";
+import UserManagement from "./pages/admin/UserManagement";
+import AuditLogs from "./pages/admin/AuditLogs";
+import Reports from "./pages/admin/Reports";
+import SystemSettings from "./pages/admin/SystemSettings";
 
 function PatientLayout({ children }) {
   return (
@@ -25,6 +40,40 @@ function PatientLayout({ children }) {
       {/* Sidebar (persistent) */}
       <aside className="w-[244px] bg-white border-r border-gray-200 sticky top-0 h-screen">
         <Sidebar role="PATIENT" />
+      </aside>
+
+      {/* Main column */}
+      <div className="flex-1 min-w-0 flex flex-col">
+        <Topbar />
+        <main className="main-inner">{children}</main>
+      </div>
+    </div>
+  );
+}
+
+function DoctorLayout({ children }) {
+  return (
+    <div className="min-h-screen flex bg-gray-50">
+      {/* Sidebar (persistent) */}
+      <aside className="w-[244px] bg-white border-r border-gray-200 sticky top-0 h-screen">
+        <Sidebar role="DOCTOR" />
+      </aside>
+
+      {/* Main column */}
+      <div className="flex-1 min-w-0 flex flex-col">
+        <Topbar />
+        <main className="main-inner">{children}</main>
+      </div>
+    </div>
+  );
+}
+
+function AdminLayout({ children }) {
+  return (
+    <div className="min-h-screen flex bg-gray-50">
+      {/* Sidebar (persistent) */}
+      <aside className="w-[244px] bg-white border-r border-gray-200 sticky top-0 h-screen">
+        <Sidebar role="ADMIN" />
       </aside>
 
       {/* Main column */}
@@ -124,6 +173,120 @@ export default function App() {
                 <PatientLayout>
                   <AccountSettings />
                 </PatientLayout>
+              </ProtectedRoute>
+            }
+          />
+
+          {/* Doctor routes (protected) */}
+          <Route
+            path="/doctor/dashboard"
+            element={
+              <ProtectedRoute allowedRoles={["DOCTOR"]}>
+                <DoctorLayout>
+                  <DoctorDashboard />
+                </DoctorLayout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/doctor/appointments"
+            element={
+              <ProtectedRoute allowedRoles={["DOCTOR"]}>
+                <DoctorLayout>
+                  <DoctorAppointments />
+                </DoctorLayout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/doctor/patients"
+            element={
+              <ProtectedRoute allowedRoles={["DOCTOR"]}>
+                <DoctorLayout>
+                  <DoctorPatients />
+                </DoctorLayout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/doctor/medical-records"
+            element={
+              <ProtectedRoute allowedRoles={["DOCTOR"]}>
+                <DoctorLayout>
+                  <DoctorMedicalRecords />
+                </DoctorLayout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/doctor/prescriptions"
+            element={
+              <ProtectedRoute allowedRoles={["DOCTOR"]}>
+                <DoctorLayout>
+                  <DoctorPrescriptions />
+                </DoctorLayout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/doctor/settings"
+            element={
+              <ProtectedRoute allowedRoles={["DOCTOR"]}>
+                <DoctorLayout>
+                  <DoctorSettings />
+                </DoctorLayout>
+              </ProtectedRoute>
+            }
+          />
+
+          {/* Admin routes (protected) */}
+          <Route
+            path="/admin/dashboard"
+            element={
+              <ProtectedRoute allowedRoles={["ADMIN"]}>
+                <AdminLayout>
+                  <AdminDashboard />
+                </AdminLayout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin/users"
+            element={
+              <ProtectedRoute allowedRoles={["ADMIN"]}>
+                <AdminLayout>
+                  <UserManagement />
+                </AdminLayout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin/audit-logs"
+            element={
+              <ProtectedRoute allowedRoles={["ADMIN"]}>
+                <AdminLayout>
+                  <AuditLogs />
+                </AdminLayout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin/reports"
+            element={
+              <ProtectedRoute allowedRoles={["ADMIN"]}>
+                <AdminLayout>
+                  <Reports />
+                </AdminLayout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin/settings"
+            element={
+              <ProtectedRoute allowedRoles={["ADMIN"]}>
+                <AdminLayout>
+                  <SystemSettings />
+                </AdminLayout>
               </ProtectedRoute>
             }
           />
