@@ -9,6 +9,8 @@ import {
   FiCreditCard,
   FiSettings,
   FiLogOut,
+  FiUsers,
+  FiFileText,
 } from "react-icons/fi";
 import { authService } from "../../services/authService";
 
@@ -22,7 +24,7 @@ const Item = ({ to, icon: Icon, label }) => (
   </NavLink>
 );
 
-export default function Sidebar() {
+export default function Sidebar({ role = "PATIENT" }) {
   const navigate = useNavigate();
   const logout = () => {
     authService.logout();
@@ -41,12 +43,32 @@ export default function Sidebar() {
 
       {/* Main nav */}
       <nav className="mt-2">
-        <Item to="/patient/dashboard" icon={FiGrid} label="Dashboard" />
-        <Item to="/patient/appointments" icon={FiCalendar} label="Appointments" />
-        <Item to="/patient/messages" icon={FiMessageSquare} label="Messages" />
-        <Item to="/patient/test-results" icon={FiDroplet} label="Test Results" />
-        <Item to="/patient/medications" icon={FiHeart} label="Medications" />
-        <Item to="/patient/billings" icon={FiCreditCard} label="Billings" />
+        {role === "PATIENT" ? (
+          <>
+            <Item to="/patient/dashboard" icon={FiGrid} label="Dashboard" />
+            <Item to="/patient/appointments" icon={FiCalendar} label="Appointments" />
+            <Item to="/patient/messages" icon={FiMessageSquare} label="Messages" />
+            <Item to="/patient/test-results" icon={FiDroplet} label="Test Results" />
+            <Item to="/patient/medications" icon={FiHeart} label="Medications" />
+            <Item to="/patient/billings" icon={FiCreditCard} label="Billings" />
+          </>
+        ) : role === "DOCTOR" ? (
+          <>
+            <Item to="/doctor/dashboard" icon={FiGrid} label="Dashboard" />
+            <Item to="/doctor/appointments" icon={FiCalendar} label="Appointments" />
+            <Item to="/doctor/patients" icon={FiUsers} label="Patients" />
+            <Item to="/doctor/medical-records" icon={FiFileText} label="Medical Records" />
+            <Item to="/doctor/prescriptions" icon={FiHeart} label="Prescriptions" />
+          </>
+        ) : role === "ADMIN" ? (
+          <>
+            <Item to="/admin/dashboard" icon={FiGrid} label="Dashboard" />
+            <Item to="/admin/users" icon={FiUsers} label="User Management" />
+            <Item to="/admin/audit-logs" icon={FiFileText} label="Audit Logs" />
+            <Item to="/admin/reports" icon={FiCalendar} label="Reports" />
+            <Item to="/admin/settings" icon={FiSettings} label="System Settings" />
+          </>
+        ) : null}
       </nav>
 
       {/* Spacer to push footer items down */}
@@ -54,15 +76,17 @@ export default function Sidebar() {
 
       {/* Footer actions: Account Settings above Logout */}
       <div className="px-3 pb-4">
-        <NavLink
-          to="/patient/settings"
-          className={({ isActive }) =>
-            `nav-item ${isActive ? "nav-item-active" : ""}`
-          }
-        >
-          <FiSettings className="text-[18px] shrink-0" />
-          <span className="text-[15px] font-medium">Account Settings</span>
-        </NavLink>
+        {role !== "ADMIN" && (
+          <NavLink
+            to={role === "DOCTOR" ? "/doctor/settings" : "/patient/settings"}
+            className={({ isActive }) =>
+              `nav-item ${isActive ? "nav-item-active" : ""}`
+            }
+          >
+            <FiSettings className="text-[18px] shrink-0" />
+            <span className="text-[15px] font-medium">Account Settings</span>
+          </NavLink>
+        )}
 
         <button
           onClick={logout}
