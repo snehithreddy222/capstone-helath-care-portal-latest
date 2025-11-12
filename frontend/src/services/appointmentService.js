@@ -102,7 +102,23 @@ export const appointmentService = {
 
   async create({ clinicianId, date, time, reason, notes }) {
     await this.ensureLoggedIn();
-    const u = authService.getCurrentUser();
+    let u = authService.getCurrentUser();
+    
+    // If patientId is missing, fetch it from the profile
+    if (!u?.patientId) {
+      try {
+        const { data } = await http.get("/auth/profile");
+        if (data?.data?.patientId) {
+          // Update the local user object with patientId
+          const updatedUser = { ...u, patientId: data.data.patientId };
+          localStorage.setItem("user", JSON.stringify(updatedUser));
+          u = updatedUser;
+        }
+      } catch (error) {
+        console.error("Error fetching patient profile:", error);
+      }
+    }
+    
     if (!u?.patientId) throw new Error("No patient profile linked to this user");
 
     const [hh, mm] = time.split(":");

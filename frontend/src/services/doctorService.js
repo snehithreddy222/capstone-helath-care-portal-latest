@@ -5,19 +5,19 @@ export const doctorService = {
   async list() {
     try {
       const { data } = await http.get("/doctors", { params: { limit: 50 } });
-      const arr = data?.data?.doctors || data?.data || data || [];
+      console.log("Doctors API response:", data);
+      const arr = data?.data || data || [];
+      console.log("Parsed doctors array:", arr);
       return arr.map((d) => ({
         id: d.id,
-        name: `Dr. ${d.firstName} ${d.lastName}`,
+        name: d.name || `Dr. ${d.firstName} ${d.lastName}`,
         specialization: d.specialization || "",
         location: d.location || "",
       }));
-    } catch {
-      // fallback so UI keeps working
-      return [
-        { id: "doc_0001", name: "Dr. Evelyn Reed", specialization: "Cardiology" },
-        { id: "doc_0002", name: "Dr. Noah Patel", specialization: "Family Medicine" },
-      ];
+    } catch (error) {
+      console.error("Error fetching doctors:", error);
+      // Return empty array so user sees no doctors instead of fake data
+      return [];
     }
   },
 };

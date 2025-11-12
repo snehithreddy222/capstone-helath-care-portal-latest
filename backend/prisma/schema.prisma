@@ -1,0 +1,216 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                      String                    @id @default(uuid())
+  username                String                    @unique
+  email                   String                    @unique
+  password                String
+  role                    String
+  isActive                Boolean                   @default(true)
+  createdAt               DateTime                  @default(now())
+  updatedAt               DateTime                  @updatedAt
+  doctor                  Doctor?
+  msg_messages            msg_messages[]
+  msg_thread_participants msg_thread_participants[]
+  patient                 Patient?
+
+  @@map("users")
+}
+
+model Patient {
+  id               String          @id @default(uuid())
+  userId           String          @unique
+  firstName        String
+  lastName         String
+  dateOfBirth      DateTime
+  gender           String
+  phoneNumber      String
+  address          String?
+  bloodGroup       String?
+  allergies        String?
+  emergencyContact String?
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+  appointments     Appointment[]
+  invoices         invoices[]
+  medicalRecords   MedicalRecord[]
+  user             User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  prescriptions    Prescription[]
+
+  @@map("patients")
+}
+
+model Doctor {
+  id              String          @id @default(uuid())
+  userId          String          @unique
+  firstName       String
+  lastName        String
+  specialization  String
+  licenseNumber   String          @unique
+  phoneNumber     String
+  yearsExperience Int?
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+  appointments    Appointment[]
+  user            User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  medicalRecords  MedicalRecord[]
+  prescriptions   Prescription[]
+
+  @@map("doctors")
+}
+
+model Appointment {
+  id        String   @id @default(uuid())
+  patientId String
+  doctorId  String
+  dateTime  DateTime
+  status    String   @default("SCHEDULED")
+  reason    String?
+  notes     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  doctor    Doctor   @relation(fields: [doctorId], references: [id], onDelete: Cascade)
+  patient   Patient  @relation(fields: [patientId], references: [id], onDelete: Cascade)
+
+  @@map("appointments")
+}
+
+model MedicalRecord {
+  id        String   @id @default(uuid())
+  patientId String
+  doctorId  String
+  diagnosis String
+  symptoms  String?
+  treatment String?
+  notes     String?
+  visitDate DateTime @default(now())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  doctor    Doctor   @relation(fields: [doctorId], references: [id], onDelete: Cascade)
+  patient   Patient  @relation(fields: [patientId], references: [id], onDelete: Cascade)
+
+  @@map("medical_records")
+}
+
+model Prescription {
+  id             String   @id @default(uuid())
+  patientId      String
+  doctorId       String
+  medicationName String
+  dosage         String
+  frequency      String
+  duration       String
+  instructions   String?
+  prescribedDate DateTime @default(now())
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  doctor         Doctor   @relation(fields: [doctorId], references: [id], onDelete: Cascade)
+  patient        Patient  @relation(fields: [patientId], references: [id], onDelete: Cascade)
+
+  @@map("prescriptions")
+}
+
+model invoices {
+  id                    String        @id
+  patientId             String
+  description           String
+  amountCents           Int
+  currency              String        @default("USD")
+  status                InvoiceStatus @default(DUE)
+  dueDate               DateTime?
+  receiptUrl            String?
+  stripeSessionId       String?
+  stripePaymentIntentId String?
+  createdAt             DateTime      @default(now())
+  updatedAt             DateTime
+  patients              Patient       @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  payments              payments[]
+
+  @@index([createdAt])
+  @@index([patientId, status])
+}
+
+model msg_attachments {
+  id           String       @id
+  messageId    String
+  url          String
+  filename     String
+  mimeType     String?
+  size         Int?
+  msg_messages msg_messages @relation(fields: [messageId], references: [id], onDelete: Cascade)
+
+  @@index([messageId])
+}
+
+model msg_messages {
+  id              String            @id
+  threadId        String
+  senderUserId    String
+  body            String
+  createdAt       DateTime          @default(now())
+  msg_attachments msg_attachments[]
+  users           User              @relation(fields: [senderUserId], references: [id], onDelete: Cascade)
+  msg_threads     msg_threads       @relation(fields: [threadId], references: [id], onDelete: Cascade)
+
+  @@index([threadId, createdAt])
+}
+
+model msg_thread_participants {
+  id          String      @id
+  threadId    String
+  userId      String
+  role        String
+  lastReadAt  DateTime?
+  msg_threads msg_threads @relation(fields: [threadId], references: [id], onDelete: Cascade)
+  users       User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([threadId, userId])
+  @@index([userId])
+}
+
+model msg_threads {
+  id                      String                    @id
+  subject                 String?
+  createdAt               DateTime                  @default(now())
+  updatedAt               DateTime
+  msg_messages            msg_messages[]
+  msg_thread_participants msg_thread_participants[]
+
+  @@index([updatedAt])
+}
+
+model payments {
+  id                    String        @id
+  invoiceId             String
+  provider              String        @default("STRIPE")
+  stripeSessionId       String?
+  stripePaymentIntentId String?
+  amountCents           Int
+  currency              String        @default("USD")
+  status                PaymentStatus @default(REQUIRES_PAYMENT)
+  createdAt             DateTime      @default(now())
+  invoices              invoices      @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+
+  @@index([invoiceId])
+  @@index([stripePaymentIntentId])
+  @@index([stripeSessionId])
+}
+
+enum InvoiceStatus {
+  DUE
+  PAID
+  CANCELED
+}
+
+enum PaymentStatus {
+  REQUIRES_PAYMENT
+  SUCCEEDED
+  CANCELED
+}
