@@ -1,72 +1,67 @@
 // src/pages/patient/PatientMessages.jsx
-import React, { useMemo, useState } from "react";
-import { FiEdit, FiSearch, FiChevronRight } from "react-icons/fi";
+import React, { useEffect, useMemo, useRef, useState } from "react";
+import { FiEdit, FiSearch, FiChevronRight, FiSend } from "react-icons/fi";
 import { format } from "date-fns";
+import { messageService } from "../../services/messageService";
 
-const MOCK_THREADS = [
-  {
-    id: "t1",
-    contact: {
-      name: "Dr. Alan Grant",
-      role: "Family Medicine",
-      avatar: null, // use initials
-    },
-    lastActivity: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000), // 2 days ago
-    unread: true,
-    subject: "Regarding your recent lab results…",
-    preview:
-      "I have reviewed your recent blood work results, and I would like to discuss them with you…",
-    messages: [
-      {
-        id: "m1",
-        from: "doctor",
-        text:
-          "Hi Maria, I have reviewed your recent blood work results, and I would like to discuss them with you. Overall, things are looking good, but there are a couple of markers we should monitor. Your cholesterol levels are slightly elevated. I'd recommend we focus on dietary adjustments for the next three months and then re-test. Please find the detailed results attached.",
-        at: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000 + 45 * 60 * 1000),
-      },
-      {
-        id: "m2",
-        from: "me",
-        text:
-          "Thank you, Dr. Grant. I've received the results. I will schedule a follow-up appointment to discuss the dietary plan. I appreciate you looking out for me.",
-        at: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000 + 15 * 60 * 60 * 1000),
-      },
-    ],
-  },
-  {
-    id: "t2",
-    contact: { name: "Appointment Reminder", role: "", avatar: null },
-    lastActivity: new Date(Date.now() - 4 * 24 * 60 * 60 * 1000),
-    unread: false,
-    subject: "Your appointment is confirmed.",
-    preview:
-      "This is a reminder for your upcoming annual physical exam scheduled for 10:30 AM…",
-    messages: [],
-  },
-  {
-    id: "t3",
-    contact: { name: "Dr. Ian Malcolm", role: "", avatar: null },
-    lastActivity: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000),
-    unread: false,
-    subject: "Follow-up on your medication",
-    preview: "Hi Maria, I am just checking in to see how you’re feeling…",
-    messages: [],
-  },
-];
+/* ---------- helpers ---------- */
 
-function Avatar({ name, size = 40 }) {
-  const initial = name?.charAt(0)?.toUpperCase() || "A";
+function pickOtherParticipant(metaOrThread) {
+  if (!metaOrThread) return null;
+  const parts = metaOrThread.participants || [];
+  if (!parts.length) return null;
+  // Prefer the doctor as “other” for patient UI
+  const doctor = parts.find((p) => p.role === "DOCTOR");
+  if (doctor) return doctor;
+  const meId = metaOrThread.me || metaOrThread.myUserId || metaOrThread.currentUserId;
+  if (meId) return parts.find((p) => p.userId !== meId) || parts[0];
+  return parts[0];
+}
+
+function formatParticipantName(p) {
+  if (!p) return null;
+  const doc = p.doctor || p.user?.doctor || null;
+  const first = doc?.firstName?.trim();
+  const last = doc?.lastName?.trim();
+  if (first || last) return `Dr. ${[first, last].filter(Boolean).join(" ")}`.trim();
+  // If we only have username and the role is DOCTOR, keep username without forcing "Dr."
+  if (p.user?.displayName) return p.user.displayName;
+  if (p.user?.username) return p.user.username;
+  return null;
+}
+
+function formatParticipantRole(p) {
+  if (!p) return "";
+  if (p.role === "DOCTOR") {
+    const spec = p.doctor?.specialization || p.user?.doctor?.specialization;
+    return spec ? spec : "Doctor";
+  }
+  return p.role || "";
+}
+
+function isMine(message, meta) {
+  if (message?.sender?.role) return message.sender.role === "PATIENT";
+  const meId = meta?.me || meta?.myUserId || meta?.currentUserId;
+  if (meId && message?.senderUserId) return message.senderUserId === meId;
+  return false;
+}
+
+/* ---------- UI ---------- */
+
+function Avatar({ name = "", size = 40 }) {
+  const initial = name?.charAt(0)?.toUpperCase() || "U";
   return (
     <div
       className="rounded-full bg-gradient-to-br from-sky-200 to-sky-300 text-sky-800 grid place-items-center font-semibold"
       style={{ width: size, height: size }}
+      title={name}
     >
       {initial}
     </div>
   );
 }
 
-function InboxItem({ active, unread, name, subject, preview, when, onClick }) {
+function InboxItem({ active, title, preview, when, unread, onClick }) {
   return (
     <button
       onClick={onClick}
@@ -76,34 +71,30 @@ function InboxItem({ active, unread, name, subject, preview, when, onClick }) {
       ].join(" ")}
     >
       <div className="flex items-start gap-3">
-        <Avatar name={name} size={36} />
+        <Avatar name={title || "T"} size={36} />
         <div className="min-w-0 flex-1">
           <div className="flex items-center justify-between">
             <p className="text-[15px] font-semibold text-gray-900 truncate">
-              {name}
+              {title || "Conversation"}
             </p>
-            <span className="ml-3 shrink-0 text-sm text-gray-500">
-              {when}
-            </span>
+            <span className="ml-3 shrink-0 text-sm text-gray-500">{when}</span>
           </div>
           <p
             className={[
               "mt-0.5 text-[13px] truncate",
               unread ? "text-sky-700 font-semibold" : "text-gray-700",
             ].join(" ")}
-            title={subject}
+            title={preview}
           >
-            {subject}
+            {preview || "—"}
           </p>
-          <p className="mt-0.5 text-[13px] text-gray-500 truncate">{preview}</p>
         </div>
       </div>
     </button>
   );
 }
 
-function MessageBubble({ from, text, at }) {
-  const mine = from === "me";
+function MessageBubble({ mine, text, at }) {
   return (
     <div className={"mt-3 " + (mine ? "text-right" : "text-left")}>
       <div
@@ -114,95 +105,303 @@ function MessageBubble({ from, text, at }) {
       >
         {text}
       </div>
-      <div className="mt-1 text-xs text-gray-500">
-        {format(at, "PPP p")}
-      </div>
+      <div className="mt-1 text-xs text-gray-500">{format(new Date(at), "PPP p")}</div>
     </div>
   );
 }
 
+/* ---------- page ---------- */
+
 export default function PatientMessages() {
   const [query, setQuery] = useState("");
-  const [activeId, setActiveId] = useState(MOCK_THREADS[0].id);
+  const [threads, setThreads] = useState([]);
+  const [threadsCursor, setThreadsCursor] = useState(null);
+  const [loadingThreads, setLoadingThreads] = useState(true);
 
-  const filtered = useMemo(() => {
-    if (!query.trim()) return MOCK_THREADS;
+  const [activeId, setActiveId] = useState(null);
+  const [activeMeta, setActiveMeta] = useState(null); // participants, subject, me
+  const [msgs, setMsgs] = useState([]);
+  const [msgsCursor, setMsgsCursor] = useState(null);
+  const [loadingMsgs, setLoadingMsgs] = useState(false);
+
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [sendText, setSendText] = useState("");
+  const sendingRef = useRef(false);
+
+  // Compose state
+  const [composeOpen, setComposeOpen] = useState(false);
+  const [composeDoctors, setComposeDoctors] = useState([]);
+  const [composeDoctorId, setComposeDoctorId] = useState("");
+  const [composeSubject, setComposeSubject] = useState("");
+  const [composeBody, setComposeBody] = useState("");
+  const [composeBusy, setComposeBusy] = useState(false);
+
+  // Cache for enriched “other names” keyed by thread id
+  const [otherNameByThread, setOtherNameByThread] = useState({});
+
+  // Load threads and unread count, then enrich a few with participant names
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        setLoadingThreads(true);
+        const [{ items, nextCursor }, unread] = await Promise.all([
+          messageService.listThreads({ includeParticipants: true }).catch(() => ({ items: [], nextCursor: null })),
+          messageService.getUnreadCount().catch(() => 0),
+        ]);
+        if (!mounted) return;
+
+        setThreads(items);
+        setThreadsCursor(nextCursor);
+        setUnreadCount(unread);
+        if (items.length && !activeId) setActiveId(items[0].id);
+
+        // Enrich first page with “other” names when list didn’t include participants
+        const needs = items.filter((t) => !(t.participants && t.participants.length)).slice(0, 12);
+        if (needs.length) {
+          const details = await Promise.all(
+            needs.map((t) => messageService.getThread(t.id).catch(() => null))
+          );
+          const map = {};
+          details.forEach((th) => {
+            if (!th) return;
+            const other = pickOtherParticipant(th);
+            const name = formatParticipantName(other);
+            if (name) map[th.id] = name;
+          });
+          if (Object.keys(map).length && mounted) {
+            setOtherNameByThread((prev) => ({ ...prev, ...map }));
+          }
+        } else {
+          // If participants exist in list items, compute names directly
+          const map = {};
+          items.forEach((t) => {
+            const other = pickOtherParticipant(t);
+            const name = formatParticipantName(other);
+            if (name) map[t.id] = name;
+          });
+          if (Object.keys(map).length && mounted) {
+            setOtherNameByThread((prev) => ({ ...prev, ...map }));
+          }
+        }
+      } finally {
+        if (mounted) setLoadingThreads(false);
+      }
+    })();
+    return () => {
+      mounted = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Load the active thread header and its messages
+  useEffect(() => {
+    if (!activeId) return;
+    let mounted = true;
+    (async () => {
+      try {
+        setLoadingMsgs(true);
+        const thread = await messageService.getThread(activeId, { limit: 20 });
+        if (!mounted) return;
+        setActiveMeta(thread);
+        setMsgs(thread?.messages || []);
+        setMsgsCursor(null);
+
+        // Cache its otherName for inbox title
+        const other = pickOtherParticipant(thread);
+        const name = formatParticipantName(other);
+        if (name) {
+          setOtherNameByThread((prev) => (prev[thread.id] ? prev : { ...prev, [thread.id]: name }));
+        }
+
+        // mark read and refresh unread count silently
+        messageService.markRead(activeId).finally(async () => {
+          const n = await messageService.getUnreadCount().catch(() => null);
+          if (n !== null && mounted) setUnreadCount(n);
+        });
+      } finally {
+        if (mounted) setLoadingMsgs(false);
+      }
+    })();
+    return () => {
+      mounted = false;
+    };
+  }, [activeId]);
+
+  const filteredThreads = useMemo(() => {
+    if (!query.trim()) return threads;
     const q = query.toLowerCase();
-    return MOCK_THREADS.filter(
-      (t) =>
-        t.contact.name.toLowerCase().includes(q) ||
-        t.subject.toLowerCase().includes(q) ||
-        t.preview.toLowerCase().includes(q)
-    );
-  }, [query]);
+    return threads.filter((t) => {
+      const subject = t.subject || "";
+      const preview = t.lastMessage?.body || "";
+      const otherName = otherNameByThread[t.id] || "";
+      return (
+        subject.toLowerCase().includes(q) ||
+        preview.toLowerCase().includes(q) ||
+        otherName.toLowerCase().includes(q)
+      );
+    });
+  }, [threads, query, otherNameByThread]);
 
-  const active =
-    filtered.find((t) => t.id === activeId) || filtered[0] || null;
+  const active = useMemo(
+    () => filteredThreads.find((t) => t.id === activeId) || filteredThreads[0] || null,
+    [filteredThreads, activeId]
+  );
 
-  const unreadCount = MOCK_THREADS.filter((t) => t.unread).length;
+  // Inbox title: prefer cached other name, else compute from any participants present, else subject
+  function threadDisplayTitle(t) {
+    const cached = otherNameByThread[t.id];
+    if (cached) return cached;
+    if (t.participants?.length) {
+      const other = pickOtherParticipant(t);
+      const name = formatParticipantName(other);
+      if (name) return name;
+    }
+    return t.subject || "Conversation";
+  }
+
+  // Load older messages
+  const loadOlder = async () => {
+    if (!activeId || sendingRef.current) return;
+    const { items, nextCursor } = await messageService.listMessages(activeId, {
+      cursor: msgsCursor || undefined,
+      limit: 20,
+    });
+    if (items.length) setMsgs((prev) => [...items, ...prev]);
+    setMsgsCursor(nextCursor);
+  };
+
+  // Send a reply
+  const onSend = async (e) => {
+    e.preventDefault();
+    const text = sendText.trim();
+    if (!text || !activeId || sendingRef.current) return;
+    sendingRef.current = true;
+    try {
+      const created = await messageService.postMessage(activeId, text);
+      setSendText("");
+      if (created) setMsgs((prev) => [...prev, created]);
+      const { items } = await messageService.listThreads({ limit: 20 });
+      setThreads(items);
+    } finally {
+      sendingRef.current = false;
+    }
+  };
+
+  // Compose
+  const openCompose = async () => {
+    setComposeOpen(true);
+    try {
+      const doctors = await messageService.listDoctors();
+      setComposeDoctors(doctors || []);
+    } catch {
+      setComposeDoctors([]);
+    }
+  };
+
+  const submitCompose = async (e) => {
+    e.preventDefault();
+    if (!composeDoctorId || !composeSubject.trim() || !composeBody.trim()) return;
+    setComposeBusy(true);
+    try {
+      const thread = await messageService.createThread({
+        doctorUserId: composeDoctorId,
+        subject: composeSubject.trim(),
+        body: composeBody.trim(),
+      });
+      const { items } = await messageService.listThreads({ limit: 20 });
+      setThreads(items);
+      if (thread?.id) setActiveId(thread.id);
+      setComposeDoctorId("");
+      setComposeSubject("");
+      setComposeBody("");
+      setComposeOpen(false);
+    } finally {
+      setComposeBusy(false);
+    }
+  };
+
+  // Header fields from activeMeta
+  const other = useMemo(() => pickOtherParticipant(activeMeta), [activeMeta]);
+  const otherName = useMemo(() => formatParticipantName(other), [other]);
+  const otherRole = useMemo(() => formatParticipantRole(other), [other]);
 
   return (
     <div className="px-6 pb-10 mx-auto max-w-7xl">
-      {/* Page header row */}
+      {/* Header */}
       <div className="flex items-center justify-between mt-6">
         <div>
           <h1 className="text-[32px] font-bold tracking-tight">Messages</h1>
-          <p className="text-gray-600">
-            You have <span className="font-semibold">{unreadCount}</span>{" "}
-            unread messages.
-          </p>
         </div>
 
-        <button className="btn-primary flex items-center gap-2 w-auto px-4 h-11">
+        <button
+          type="button"
+          className="btn-primary flex items-center gap-2 w-auto px-4 h-11"
+          onClick={openCompose}
+        >
           <FiEdit className="text-white text-[18px]" />
           Compose Message
         </button>
       </div>
 
-      {/* Content split */}
+      {/* Split */}
       <div className="mt-6 grid grid-cols-12 gap-6">
         {/* LEFT: Inbox */}
         <div className="col-span-12 lg:col-span-5">
           <div className="card-soft p-0">
-            {/* Inbox header */}
             <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200/70">
               <div className="font-semibold">Inbox</div>
               <span className="text-xs bg-sky-50 text-sky-700 border border-sky-200 px-2.5 py-1 rounded-full">
-                {MOCK_THREADS.length} Total
+                {threads.length} Total
               </span>
             </div>
 
-            {/* Search in inbox */}
             <div className="px-4 py-3 border-b border-gray-200/70">
               <div className="search-pill">
                 <FiSearch className="text-gray-400" />
                 <input
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
-                  placeholder="Search messages…"
+                  placeholder="Search subject or last message…"
                   className="search-input"
                 />
               </div>
             </div>
 
-            {/* List */}
             <div className="max-h-[580px] overflow-auto">
-              {filtered.map((t) => (
-                <InboxItem
-                  key={t.id}
-                  active={t.id === active?.id}
-                  unread={t.unread}
-                  name={t.contact.name}
-                  subject={t.subject}
-                  preview={t.preview}
-                  when={format(t.lastActivity, "d MMM")}
-                  onClick={() => setActiveId(t.id)}
-                />
-              ))}
-              {filtered.length === 0 && (
-                <div className="px-4 py-10 text-center text-gray-500">
-                  No messages found.
-                </div>
+              {loadingThreads && (
+                <div className="px-4 py-6 text-gray-500">Loading threads…</div>
+              )}
+              {!loadingThreads &&
+                filteredThreads.map((t) => (
+                  <InboxItem
+                    key={t.id}
+                    active={t.id === active?.id}
+                    title={threadDisplayTitle(t)}
+                    preview={t.lastMessage?.body || ""}
+                    when={format(new Date(t.lastActivity || t.updatedAt), "d MMM")}
+                    unread={(t.unreadCount ?? 0) > 0}
+                    onClick={() => setActiveId(t.id)}
+                  />
+                ))}
+              {!loadingThreads && filteredThreads.length === 0 && (
+                <div className="px-4 py-10 text-center text-gray-500">No messages found.</div>
+              )}
+
+              {threadsCursor && (
+                <button
+                  className="w-full py-3 text-sm text-sky-700 hover:underline"
+                  onClick={async () => {
+                    const { items, nextCursor } = await messageService.listThreads({
+                      cursor: threadsCursor,
+                      limit: 20,
+                    });
+                    setThreads((prev) => [...prev, ...items]);
+                    setThreadsCursor(nextCursor);
+                  }}
+                >
+                  Load more
+                </button>
               )}
             </div>
           </div>
@@ -211,18 +410,26 @@ export default function PatientMessages() {
         {/* RIGHT: Conversation */}
         <div className="col-span-12 lg:col-span-7">
           <div className="card-soft">
-            {active ? (
+            {!active ? (
+              <div className="py-16 text-center text-gray-500">
+                Select a conversation to view messages.
+              </div>
+            ) : (
               <>
                 {/* Conversation header */}
                 <div className="flex items-center justify-between pb-4 border-b border-gray-200/70">
                   <div className="flex items-center gap-3">
-                    <Avatar name={active.contact.name} size={44} />
+                    <Avatar name={otherName || active?.subject || "Conversation"} size={44} />
                     <div>
                       <div className="font-semibold text-[17px]">
-                        {active.contact.name}
+                        {otherName || active?.subject || "Conversation"}
                       </div>
                       <div className="text-sm text-gray-500">
-                        {active.contact.role || "—"}
+                        {otherRole
+                          ? otherRole
+                          : activeMeta?.participants?.length
+                          ? `${activeMeta.participants.length} participants`
+                          : "—"}
                       </div>
                     </div>
                   </div>
@@ -235,19 +442,107 @@ export default function PatientMessages() {
 
                 {/* Messages */}
                 <div className="pt-4">
-                  {active.messages.map((m) => (
-                    <MessageBubble key={m.id} from={m.from} text={m.text} at={m.at} />
+                  {loadingMsgs && msgs.length === 0 && (
+                    <div className="text-gray-500">Loading messages…</div>
+                  )}
+
+                  {msgsCursor && (
+                    <button
+                      className="text-sky-700 text-sm hover:underline"
+                      onClick={loadOlder}
+                    >
+                      Load older messages
+                    </button>
+                  )}
+
+                  {msgs.map((m) => (
+                    <MessageBubble
+                      key={m.id}
+                      mine={isMine(m, activeMeta)}
+                      text={m.body}
+                      at={m.createdAt}
+                    />
                   ))}
                 </div>
+
+                {/* Composer */}
+                <form onSubmit={onSend} className="mt-6 flex items-center gap-2">
+                  <input
+                    value={sendText}
+                    onChange={(e) => setSendText(e.target.value)}
+                    placeholder="Type your message…"
+                    className="input flex-1"
+                  />
+                  <button type="submit" className="btn-primary h-12 px-4 rounded-lg inline-flex items-center gap-2">
+                    <FiSend />
+                    Send
+                  </button>
+                </form>
               </>
-            ) : (
-              <div className="py-16 text-center text-gray-500">
-                Select a conversation to view messages.
-              </div>
             )}
           </div>
         </div>
       </div>
+
+      {/* Compose sheet */}
+      {composeOpen && (
+        <div className="fixed inset-0 bg-black/30 z-50 flex items-center justify-center">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-xl p-6">
+            <div className="text-lg font-semibold mb-4">New message</div>
+            <form onSubmit={submitCompose} className="space-y-4">
+              <div>
+                <label className="text-sm font-medium text-gray-700">To doctor</label>
+                <select
+                  className="input mt-1 w-full"
+                  value={composeDoctorId}
+                  onChange={(e) => setComposeDoctorId(e.target.value)}
+                >
+                  <option value="">Select a doctor…</option>
+                  {composeDoctors.map((d) => (
+                    <option key={d.userId || d.id} value={d.userId || d.id}>
+                      {`Dr. ${[d.firstName, d.lastName].filter(Boolean).join(" ")}`}{d.specialization ? ` • ${d.specialization}` : ""}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="text-sm font-medium text-gray-700">Subject</label>
+                <input
+                  className="input mt-1 w-full"
+                  value={composeSubject}
+                  onChange={(e) => setComposeSubject(e.target.value)}
+                  placeholder="Subject"
+                />
+              </div>
+
+              <div>
+                <label className="text-sm font-medium text-gray-700">Message</label>
+                <textarea
+                  className="input mt-1 w-full min-h-[120px]"
+                  value={composeBody}
+                  onChange={(e) => setComposeBody(e.target.value)}
+                  placeholder="Type your message…"
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-2">
+                <button
+                  type="button"
+                  className="btn-secondary"
+                  onClick={() => setComposeOpen(false)}
+                  disabled={composeBusy}
+                >
+                  Cancel
+                </button>
+                <button type="submit" className="btn-primary" disabled={composeBusy}>
+                  {composeBusy ? "Sending…" : "Send"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
