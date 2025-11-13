@@ -259,3 +259,6 @@ Authorization: Bearer YOUR_JWT_TOKEN
 - `404 Not Found` - Resource doesn't exist
 - `409 Conflict` - Duplicate entry (username, email, license)
 - `500 Internal Server Error` - Server error
+
+DATABASE_URL_OLD="postgresql://healthcare_admin:HealthCare2024!@localhost:5432/healthcare_portal?schema=public"
+DATABASE_URL=postgresql://healthcare_admin:HealthCare2024%21@20.42.48.79:5432/healthcare_portal?schema=public

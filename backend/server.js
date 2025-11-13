@@ -1,100 +1,77 @@
-// server.js
+// backend/server.js
 const express = require('express');
 const cors = require('cors');
 require('dotenv').config();
 
+// Core routers
 const authRoutes = require('./routes/authRoutes');
 const patientRoutes = require('./routes/patientRoutes');
 const doctorRoutes = require('./routes/doctorRoutes');
 const appointmentRoutes = require('./routes/appointmentRoutes');
+const messageRoutes = require('./routes/messageRoutes');
+const testResultRoutes = require('./routes/testResultRoutes');
+const fileRoutes = require('./routes/fileRoutes');
+const prescriptionRoutes = require('./routes/prescriptionRoutes');
+
+// Payments
+// 1) Webhook must receive RAW body (Stripe signature verification)
+// 2) JSON routes for normal API
+const paymentsJsonRoutes = require('./routes/paymentsRoutes');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Middleware
+// CORS first
 app.use(cors());
+
+// Stripe webhook MUST be mounted BEFORE express.json()
+// Use express.raw only for this specific endpoint.
+app.post(
+  '/api/payments/webhook',
+  express.raw({ type: 'application/json' }),
+  require('./routes/paymentsWebhookRoute')
+);
+
+// Normal body parsing for all other routes
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Request logging middleware
-app.use((req, res, next) => {
-  console.log(`${new Date().toISOString()} - ${req.method} ${req.path}`);
+// Simple request logger
+app.use((req, _res, next) => {
+  console.log(`${new Date().toISOString()} ${req.method} ${req.originalUrl}`);
   next();
 });
 
-// Root
-app.get('/', (req, res) => {
-  res.json({
-    success: true,
-    message: 'Healthcare Portal API',
-    version: '1.0.0',
-    endpoints: {
-      auth: {
-        register: 'POST /api/auth/register',
-        login: 'POST /api/auth/login',
-        profile: 'GET /api/auth/profile'
-      },
-      patients: {
-        me: 'GET /api/patients/me',
-        create: 'POST /api/patients',
-        getAll: 'GET /api/patients',
-        getById: 'GET /api/patients/:id',
-        update: 'PUT /api/patients/:id',
-        delete: 'DELETE /api/patients/:id'
-      },
-      doctors: {
-        listSimple: 'GET /api/doctors',
-        listPaginated: 'GET /api/doctors/paginated',
-        getById: 'GET /api/doctors/:id',
-        create: 'POST /api/doctors',
-        update: 'PUT /api/doctors/:id',
-        delete: 'DELETE /api/doctors/:id'
-      },
-      appointments: {
-        mine: 'GET /api/appointments/mine',
-        create: 'POST /api/appointments',
-        getAll: 'GET /api/appointments',
-        getById: 'GET /api/appointments/:id',
-        update: 'PUT /api/appointments/:id',
-        cancel: 'PATCH /api/appointments/:id/cancel',
-        delete: 'DELETE /api/appointments/:id'
-      }
-    }
-  });
-});
+// Health check
+app.get('/api/health', (_req, res) => res.json({ ok: true }));
 
-// API Routes
+// API routers
 app.use('/api/auth', authRoutes);
 app.use('/api/patients', patientRoutes);
 app.use('/api/doctors', doctorRoutes);
 app.use('/api/appointments', appointmentRoutes);
+app.use('/api/messages', messageRoutes);
+app.use('/api/test-results', testResultRoutes);
+app.use('/api/medications', prescriptionRoutes);
+app.use('/api/files', fileRoutes);
+
+// Payments JSON routes (create checkout session, list invoices, receipts, etc.)
+app.use('/api/payments', paymentsJsonRoutes);
 
 // 404 handler
 app.use((req, res) => {
   res.status(404).json({ success: false, message: 'Endpoint not found' });
 });
 
-// Error handler
-app.use((err, req, res, next) => {
-  console.error(err.stack);
+// 500 handler
+app.use((err, _req, res, _next) => {
+  console.error(err);
   res.status(500).json({ success: false, message: 'Something went wrong!', error: err.message });
 });
 
-// Start
+// Start server
 app.listen(PORT, () => {
-  console.log('=================================');
-  console.log('🏥 Healthcare Portal API Server');
-  console.log('=================================');
-  console.log(`✅ Server running on port ${PORT}`);
-  console.log(`🌐 Local: http://localhost:${PORT}`);
-  console.log(`📚 API Docs: http://localhost:${PORT}/`);
-  console.log('=================================');
-  console.log('Available Endpoints:');
-  console.log('  Auth: /api/auth');
-  console.log('  Patients: /api/patients');
-  console.log('  Doctors: /api/doctors');
-  console.log('  Appointments: /api/appointments');
-  console.log('=================================');
+  console.log(`API listening on http://localhost:${PORT}`);
 });
 
 module.exports = app;
